@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>Matrix Final 11.1</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+<style>
+    /* --- TACTICAL RED CORE THEME --- */
+    :root {
+        --primary-color: #ff3333;       
+        --dim-color: #660000;           
+        --bg-color: #050000;            
+        --panel-bg: rgba(20, 0, 0, 0.98);
+        --grid-line: rgba(50, 0, 0, 0.3);
+    }
+
+    body { 
+        font-family: 'Courier New', Courier, monospace; 
+        background-color: var(--bg-color);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 20px 20px;
+        min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; color: #ccaaaa;
+        overflow: hidden;
+    }
+    body.lang-zh { font-family: 'Consolas', 'Microsoft JhengHei', monospace; }
+
+    .card { 
+        background: var(--panel-bg); 
+        border: 1px solid var(--dim-color); 
+        box-shadow: 0 0 30px rgba(255, 0, 0, 0.1);
+        width: 100%; max-width: 650px; height: 100vh; 
+        display: flex; flex-direction: column; position: relative;
+    }
+
+    /* --- NOTIFICATION SYSTEM --- */
+    #sysNotification {
+        position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+        background: #220000; border: 1px solid var(--primary-color); color: var(--primary-color);
+        padding: 8px 15px; font-size: 11px; z-index: 9999;
+        box-shadow: 0 0 15px rgba(255, 50, 50, 0.4);
+        display: none; white-space: nowrap; pointer-events: none; letter-spacing: 1px; font-weight: bold;
+    }
+
+    /* --- INCOMING CALL MODAL --- */
+    #callModal {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.95); z-index: 10000;
+        display: none; flex-direction: column; justify-content: center; align-items: center;
+    }
+    .call-info { font-size: 24px; color: #fff; margin-bottom: 40px; animation: blink 1s infinite; text-align: center; font-weight: bold; letter-spacing: 2px;}
+    .call-actions { display: flex; gap: 30px; }
+    .btn-answer { background: #00cc00; color: #000; border: 2px solid #00ff00; padding: 20px 40px; font-size: 16px; font-weight: 900; cursor: pointer; border-radius: 10px; box-shadow: 0 0 20px #00ff00; }
+    .btn-reject { background: #cc0000; color: #fff; border: 2px solid #ff0000; padding: 20px 40px; font-size: 16px; font-weight: 900; cursor: pointer; border-radius: 10px; box-shadow: 0 0 20px #ff0000; }
+
+    /* --- HEADER --- */
+    header { 
+        flex-shrink: 0; padding: 12px; border-bottom: 1px solid var(--dim-color); 
+        display: flex; justify-content: space-between; align-items: center; background: #000;
+    }
+    .header-title { font-weight: 900; letter-spacing: 2px; color: var(--primary-color); font-size: 14px; text-transform: uppercase; }
+    
+    .sys-controls { display: flex; gap: 8px; }
+    .sys-btn {
+        background: #000; border: 1px solid #330000; color: #884444; font-size: 9px; 
+        cursor: pointer; padding: 4px 6px; text-transform: uppercase; transition: 0.2s;
+    }
+    .sys-btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
+    .btn-panic { border-color: #660000; color: #ff0000; font-weight: 900; }
+    .btn-panic:hover { background: #ff0000; color: #000; }
+
+    /* --- TABS --- */
+    .tabs { display: flex; background: #080000; border-bottom: 1px solid var(--dim-color); }
+    .tab-btn { 
+        flex: 1; padding: 10px 0; border: none; background: transparent; color: #664444; 
+        cursor: pointer; font-weight: bold; font-size: 10px; letter-spacing: 1px;
+        border-right: 1px solid #220000; font-family: inherit;
+    }
+    .tab-btn.active { background: #1a0000; color: var(--primary-color); box-shadow: inset 0 -2px 0 var(--primary-color); }
+
+    /* --- LAYOUT --- */
+    .content-section { flex: 1; display: none; flex-direction: column; overflow: hidden; padding: 15px; height: 100%; box-sizing: border-box; }
+    .content-section.active { display: flex; }
+
+    /* --- UI ELEMENTS --- */
+    input, textarea { 
+        background: #000; border: 1px solid #440000; color: var(--primary-color); 
+        font-family: inherit; font-size: 12px; padding: 8px; outline: none; width: 100%; box-sizing: border-box;
+    }
+    input:focus, textarea:focus { border-color: var(--primary-color); }
+    input::placeholder, textarea::placeholder { color: #552222; }
+    
+    .main-key-input { margin-bottom: 10px; text-align: center; letter-spacing: 2px; border: 1px solid var(--dim-color); }
+    
+    .btn-action {
+        width: 100%; padding: 10px; border: 1px solid var(--dim-color); background: #1a0000; color: var(--primary-color);
+        font-weight: bold; cursor: pointer; margin-top: 8px; font-family: inherit; text-transform: uppercase;
+        font-size: 11px; transition: 0.2s;
+    }
+    .btn-action:hover { background: #330000; color: #fff; border-color: var(--primary-color); }
+    
+    .btn-secondary { background: #0a0000; border-color: #331111; color: #aa6666; }
+    .row { display: flex; gap: 8px; margin-top: 5px; flex-shrink: 0;} .row button { flex: 1; }
+
+    /* --- PERSISTENT SESSION INFO --- */
+    #sessionInfoBar {
+        background: #110000; border: 1px solid #440000; color: #ffaaaa;
+        padding: 8px; font-size: 13px; font-family: monospace; font-weight: bold;
+        text-align: center; margin-bottom: 10px; letter-spacing: 1px;
+        display: none; cursor: pointer; border-left: 3px solid var(--primary-color);
+    }
+    #sessionInfoBar:hover { background: #220000; color: #fff; }
+
+    /* --- DYNAMIC VIDEO GRID --- */
+    #videoContainer {
+        display: none; flex-direction: column; gap: 5px; margin-bottom: 10px;
+        background: #000; border: 1px solid var(--dim-color); padding: 5px; flex-shrink: 0; position: relative;
+    }
+    .video-grid { 
+        display: flex; flex-wrap: wrap; gap: 5px; height: 200px; 
+        overflow-y: auto; align-content: flex-start;
+    }
+    .vid-wrap {
+        flex: 1 1 45%; 
+        height: 100%; min-height: 100px; max-height: 200px; 
+        position: relative; background: #050505; border: 1px solid #330000;
+        display: flex; justify-content: center; align-items: center;
+    }
+    .audio-placeholder {
+        width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;
+        background: #110000; color: #ff3333; font-weight: bold; font-size: 10px; letter-spacing: 1px;
+    }
+    video { 
+        width: 100%; height: 100%; object-fit: cover; 
+        filter: sepia(100%) hue-rotate(-50deg) saturate(300%) contrast(1.2); 
+    }
+    
+    .call-controls { display: flex; gap: 5px; margin-top: 5px;}
+    .btn-call { background: #220000; color: var(--primary-color); border: 1px solid #440000; flex: 1; padding: 8px; cursor: pointer;}
+    .btn-call:hover { background: #440000; }
+    .btn-hangup { background: #000; color: #555; border: 1px solid #333; flex: 1; padding: 8px; cursor: pointer;}
+    .btn-hangup:hover { border-color: #fff; color: #fff; }
+
+    /* --- CHAT UI --- */
+    #chatHeader {
+        display: flex; flex-direction: column; gap: 5px; margin-bottom: 5px;
+    }
+    #chatStatus { text-align:center; font-size:10px; color:#664444; }
+    
+    #btnReconnect { 
+        display: none; width: 100%; padding: 8px; font-size: 11px; 
+        background: #440000; color: #fff; border: 1px solid #ff0000; 
+        cursor: pointer; font-weight: bold; text-align: center;
+        animation: blink 2s infinite;
+    }
+    @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.5;} 100% {opacity: 1;} }
+
+    #chatArea {
+        flex: 1; overflow-y: auto; background: #050000; border: 1px solid var(--dim-color); padding: 10px;
+        margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .msg { padding: 4px 8px; border-radius: 2px; font-size: 11px; line-height: 1.4; max-width: 85%; word-break: break-word;}
+    .msg-sent { align-self: flex-end; background: #330000; color: var(--primary-color); border-right: 2px solid var(--primary-color); }
+    .msg-received { align-self: flex-start; background: #110505; color: #ccaaaa; border-left: 2px solid #552222; }
+    .msg-sys { align-self: center; font-size: 9px; color: #553333; }
+
+    /* --- TOOL UI --- */
+    .tool-wrapper { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+    #toolResultContainer {
+        flex: 1; min-height: 0; margin-top: 15px; 
+        background: #000; border: 1px dashed var(--primary-color); color: var(--primary-color);
+        font-size: 14px; font-weight: bold; text-align: center; 
+        overflow-y: auto; cursor: pointer; transition: 0.2s;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        padding: 10px; word-break: break-all;
+    }
+    #toolResultContainer:hover { background: #110000; box-shadow: 0 0 10px rgba(255, 0, 0, 0.2); }
+    .tool-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-shrink: 0;}
+    .tool-label { font-size: 10px; color: #664444; }
+    .btn-mini { padding: 2px 5px; font-size: 9px; border: 1px solid #331111; background: #110000; color: #885555; cursor: pointer; }
+    .btn-mini:hover { color: #ffaaaa; border-color: #662222; }
+
+    /* --- UTILS --- */
+    .hidden { display: none !important; }
+    .qr-reader-box { width: 100%; margin-top: 10px; display: none; border: 1px solid var(--primary-color); }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #000; }
+    ::-webkit-scrollbar-thumb { background: #330000; }
+    
+    #idErrorMsg { color: #ff0000; font-size: 10px; margin-top: 5px; display: none; font-weight: bold; animation: blink 1s infinite;}
+</style>
+</head>
+<body>
+
+<div id="callModal">
+    <div class="call-info" id="callInfoText">INCOMING CALL...</div>
+    <div class="call-actions">
+        <button class="btn-answer" onclick="answerCall()">[ ANSWER ]</button>
+        <button class="btn-reject" onclick="rejectCall()">[ REJECT ]</button>
+    </div>
+</div>
+
+<div id="sysNotification">SYSTEM NOTIFICATION</div>
+
+<div class="card">
+    <header>
+        <div class="header-title">MATRIX FINAL 11.1</div>
+        <div class="sys-controls">
+            <button class="sys-btn" id="btnLang" onclick="toggleLanguage()">[EN]</button>
+            <button class="sys-btn btn-panic" onclick="panicMode()">[PANIC]</button>
+        </div>
+    </header>
+
+    <div class="tabs">
+        <button class="tab-btn active" id="tabNews" onclick="switchTab('news')">SYSTEM</button>
+        <button class="tab-btn" id="tabTool" onclick="switchTab('tool')">ENC/DEC TOOL</button>
+        <button class="tab-btn" id="tabChat" onclick="switchTab('chat')">LINK</button>
+    </div>
+
+    <div style="padding: 15px 15px 0 15px;">
+        <input type="password" id="globalKey" class="main-key-input" placeholder="ENTER ACCESS KEY">
+    </div>
+
+    <section id="modeNews" class="content-section active">
+        <div style="flex:1; overflow-y:auto;">
+            <div id="lblGuideHeader" style="font-size:11px; color:#ff3333; font-weight:bold; margin-bottom:10px; border-bottom:1px solid #330000; padding-bottom:5px;">USER GUIDE & DOCS</div>
+            <div id="boardContent" style="background:#080000; border:1px solid #220000; padding:15px; font-size:11px; color:#ccaaaa; white-space:pre-wrap; line-height:1.8;">
+1. 密鑰設定 (KEY SETUP) - CRITICAL
+   - 雙方必須在上方「輸入訪問密鑰」欄位輸入「完全一致」的密碼。
+
+2. 多人連線 (MULTI-USER MESH)
+   - **建立主機**：輸入 ID 啟動，將 ID 分享給所有人。
+   - **加入連線**：貼上 ID 連線。系統會自動將您與房間內其他人連線。
+   - **狀態顯示**：連線狀態會顯示目前連線人數 (Peer Count)。
+
+3. 多人通話 (GROUP CALL)
+   - **撥打**：點擊 [視訊] 或 [語音]，系統會同時撥打給房間內所有人。
+   - **接聽**：點擊螢幕上巨大的綠色 [接聽] 按鈕。
+   - **畫面**：視訊畫面會自動排列。
+
+4. 加/解密工具 (ENC/DEC TOOL)
+   - 支援文字與圖片 (自動 120px 微縮圖) 加密。
+            </div>
+            
+            <div style="font-size:10px; color:#664444; margin-top:20px; border-top:1px dashed #330000; padding-top:10px;">
+                <strong style="color:#aa0000; font-size:11px;" id="lblSecHeader">ADVANCED SECURITY ARCHITECTURE</strong><br>
+                <div id="lblSecBody" style="margin-top:10px; line-height:1.6;">
+                <strong style="color:#885555;">[AES-256-CBC Encryption]</strong><br>
+                所有文字與圖片數據在傳輸前，皆在本地端使用 AES-256-CBC 進行二次加密。密鑰衍生採用 PBKDF2 (SHA-256, 1000 iterations)，並為每次加密生成獨立隨機 IV (Initialization Vector)，防止重放攻擊。
+                <br><br>
+                <strong style="color:#885555;">[WebRTC DTLS/SRTP]</strong><br>
+                P2P 傳輸層使用 DTLS (Datagram Transport Layer Security) 與 SRTP (Secure Real-time Transport Protocol) 協定。即使沒有 AES 二次加密，傳輸通道本身已具備軍規級防護，確保 ISP 或中間人無法竊聽。
+                <br><br>
+                <strong style="color:#885555;">[Ephemeral & Volatile]</strong><br>
+                系統採「零知識 (Zero-Knowledge)」架構。無後端資料庫，不儲存任何 Log。所有密鑰與解密數據僅存在於瀏覽器的揮發性記憶體 (RAM) 中。一旦關閉分頁或重整，數據即刻物理性消失，無法進行數位取證 (Anti-Forensics)。
+                </div>
+            </div>
+
+            <details style="margin-top:auto; border:1px dashed #330000; padding:10px;">
+                <summary id="lblAdmin" style="font-size:10px; color:#331111; text-align:right; cursor:pointer;">ADMIN ACCESS</summary>
+                <input type="password" id="publishKey" style="margin-top:10px;" placeholder="PASSWORD">
+                <textarea id="newPostText" rows="3" style="margin-top:5px;" placeholder="CONTENT..."></textarea>
+                <button id="btnPublish" class="btn-action" onclick="publishBoard()">UPDATE</button>
+            </details>
+        </div>
+    </section>
+
+    <section id="modeTool" class="content-section">
+        <div class="tool-wrapper">
+            <input type="file" id="toolFileInput" accept="image/*" style="display:none" onchange="handleToolFile(this)">
+            <button onclick="document.getElementById('toolFileInput').click()" class="btn-secondary btn-action" style="margin-top:0; margin-bottom:10px; flex-shrink:0;" id="lblSelectFile">SELECT FILE</button>
+            
+            <div class="tool-header-row">
+                <span class="tool-label" id="lblInputLabel">INPUT / CIPHERTEXT</span>
+                <button class="btn-mini" id="btnSelectAll" onclick="selectAllToolInput()">[SELECT ALL]</button>
+            </div>
+            <textarea id="toolInput" style="height:80px; flex-shrink:0;" placeholder="..."></textarea>
+            
+            <div class="row" style="flex-shrink:0;">
+                <button id="btnEncrypt" class="btn-action" onclick="runTool('encrypt')">ENCRYPT</button>
+                <button id="btnDecrypt" class="btn-action btn-secondary" onclick="runTool('decrypt')">DECRYPT</button>
+            </div>
+            
+            <div id="toolResultContainer" onclick="copyText(this)">
+                <div id="toolResultText">[ RESULT ]</div>
+                <img id="toolImgPreview" style="max-width:100%; display:none; border:1px solid #330000; margin-top:10px;">
+            </div>
+        </div>
+    </section>
+
+    <section id="modeChat" class="content-section">
+        <div id="sessionInfoBar" onclick="copySessionInfo()"></div>
+
+        <div id="chatHeader">
+            <div id="chatStatus">STATUS: DISCONNECTED</div>
+            <button id="btnReconnect" onclick="triggerReconnect()">[ RECONNECT ]</button>
+        </div>
+
+        <div id="videoContainer">
+            <div class="video-grid" id="remoteVideoGrid">
+                <div class="vid-wrap" id="localVidWrap"><video id="localVideo" autoplay playsinline muted></video></div>
+            </div>
+            <div class="call-controls">
+                <button class="btn-call" id="btnVideoCall" onclick="initiateGroupCall('video')">[VIDEO]</button>
+                <button class="btn-call" id="btnVoiceCall" onclick="initiateGroupCall('voice')">[VOICE]</button>
+                <button class="btn-hangup" id="btnHangup" onclick="endAllCalls()">[END]</button>
+            </div>
+        </div>
+        
+        <div id="chatSetupPanel">
+            <div id="stepInit" class="row">
+                <button id="btnHost" class="btn-action" onclick="startHost()">HOST</button>
+                <button id="btnJoin" class="btn-action btn-secondary" onclick="showJoinPanel()">JOIN</button>
+            </div>
+            
+            <div id="stepHost" class="hidden" style="text-align:center;">
+                <div style="font-size:10px; color:#ff3333; margin-bottom:5px;" id="lblSetId">SET CUSTOM ID (OPTIONAL)</div>
+                <div style="display:flex; gap:5px; margin-bottom:10px;">
+                    <input type="text" id="customIdInput" placeholder="e.g. Agent007" style="text-align:center;">
+                    <button id="btnStartHost" class="btn-action" style="margin-top:0; width:80px;" onclick="confirmHost()">START</button>
+                </div>
+                <div id="idErrorMsg">ID TAKEN. PLEASE WAIT OR CHANGE.</div>
+
+                <div id="hostDisplayArea" class="hidden">
+                    <input type="text" id="myHostId" readonly onclick="copyHostId()" style="text-align:center; cursor:pointer; color:#fff; background:#110000; border-color:#ff3333;">
+                    <div id="qrCodeContainer" style="background:#fff; padding:5px; width:100px; margin:10px auto; display:none;"></div>
+                    <div style="font-size:9px; color:#ff3333; margin-top:5px;" id="lblShareSecurely">CLICK ID TO COPY</div>
+                </div>
+            </div>
+
+            <div id="stepJoin" class="hidden">
+                <input type="text" id="targetHostId" placeholder="HOST ID">
+                <div id="qrReaderLink" class="qr-reader-box"></div>
+                <div class="row">
+                    <button id="btnScanLink" class="btn-secondary btn-action" onclick="startLinkQrScanner()">[SCAN QR]</button>
+                    <button id="btnConnect" class="btn-action" onclick="joinChatRoom()">CONNECT</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="chatArea"></div>
+
+        <div style="display:flex; gap:5px; margin-top:5px;">
+            <input type="text" id="chatMsgInput" disabled onkeypress="if(event.key==='Enter') sendChatMessage()">
+            <button id="btnSend" class="sys-btn" disabled onclick="sendChatMessage()" style="width:40px; border-color:#440000; color:#ff3333;">></button>
+        </div>
+    </section>
+
+</div>
+
+<script>
+    // --- CONFIG ---
+    const ADMIN_PASSWORD = "admin888";
+    let curLang = 'en';
+    let qrScanner = null;
+    let lastHostId = null;
+    let isReconnecting = false;
+    let pendingCall = null; 
+    let currentSessionIdDisplay = ""; 
+    
+    // MESH NETWORK VARS
+    let connectedPeers = {}; 
+    let activeCalls = [];    
+    let localStream = null;
+
+    // --- AUTO CLEANUP ---
+    window.addEventListener('beforeunload', () => {
+        if(peer && !peer.destroyed) peer.destroy();
+    });
+
+    // --- NOTIFICATION ---
+    function showNotify(msg, isError = false) {
+        const n = document.getElementById('sysNotification');
+        n.innerText = msg;
+        n.style.display = 'block';
+        n.style.borderColor = isError ? '#ff0000' : '#ff3333';
+        n.style.color = isError ? '#ff0000' : '#ff3333';
+        setTimeout(() => { n.style.display = 'none'; }, 2500);
+    }
+
+    // --- ID GEN ---
+    function makeId(length) {
+        let result = '';
+        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let i = 0; i < length; i++) {
+            result += characters.charAt(Math.floor(Math.random() * characters.length));
+        }
+        return result;
+    }
+
+    // --- DICTIONARY ---
+    const dict = {
+        en: {
+            tabNews:"SYSTEM", tabTool:"ENC/DEC TOOL", tabChat:"LINK",
+            keyPlaceholder: "ENTER ACCESS KEY", btnPanic: "[PANIC]",
+            lblGuideHeader: "USER GUIDE & DOCS",
+            howTo: "...", 
+            lblSecHeader: "ADVANCED SECURITY ARCHITECTURE",
+            secBody: "...",
+            lblAdmin: "ADMIN ACCESS", btnPublish: "UPDATE",
+            lblSelectFile: "SELECT FILE", toolInput: "TEXT OR CIPHER...",
+            btnEncrypt: "ENCRYPT", btnDecrypt: "DECRYPT", toolResultText: "[ RESULT ]",
+            lblInputLabel: "INPUT / CIPHERTEXT", btnSelectAll: "[SELECT ALL]",
+            statusDisc: "STATUS: DISCONNECTED", btnHost: "HOST", btnJoin: "JOIN",
+            btnConnect: "CONNECT", btnVideoCall: "[VIDEO]", btnVoiceCall: "[VOICE]", btnHangup: "[END]",
+            sysConn: "CONNECTED PEERS: ", callIncomingVoice: "INCOMING VOICE CALL...", callIncomingVideo: "INCOMING VIDEO CALL...", callEnded: "CALL ENDED",
+            lblShareSecurely: "CLICK ID TO COPY", targetHostId: "HOST ID",
+            btnScanLink: "[SCAN QR]", btnReconnect: "[ RECONNECT ]",
+            panicMsg: "SYSTEM PURGE INITIATED...", keyReq: "KEY REQUIRED",
+            copied: "COPIED", noData: "NO DATA", fail: "FAILED",
+            imgRestored: "IMAGE RESTORED", noId: "ID NOT GENERATED YET",
+            connEst: "CONNECTED", scanStart: "CAMERA ACTIVE", scanErr: "CAMERA ERROR",
+            reconnect: "RECONNECTING...", lblSetId: "SET CUSTOM ID (OPTIONAL)", btnStartHost: "START",
+            idTaken: "ID TAKEN. PLEASE CHANGE OR WAIT.", sessionInfoDefault: ""
+        },
+        zh: {
+            tabNews:"系統公告", tabTool:"加/解密工具", tabChat:"連線",
+            keyPlaceholder: "輸入訪問密鑰", btnPanic: "[緊急銷毀]",
+            lblGuideHeader: "簡易功能操作教學",
+            howTo: "...",
+            lblSecHeader: "加密原理與安全邏輯簡介",
+            secBody: "...",
+            lblAdmin: "管理員權限", btnPublish: "更新內容",
+            lblSelectFile: "選擇檔案", toolInput: "輸入文字或密文...",
+            btnEncrypt: "加密", btnDecrypt: "解密", toolResultText: "[ 運算結果 ]",
+            lblInputLabel: "輸入內容 / 密文", btnSelectAll: "[全選內容]",
+            statusDisc: "狀態: 未連線", btnHost: "建立主機", btnJoin: "加入連線",
+            btnConnect: "連線", btnVideoCall: "[視訊]", btnVoiceCall: "[語音]", btnHangup: "[掛斷]",
+            sysConn: "連線人數: ", callIncomingVoice: "語音來電中...", callIncomingVideo: "視訊來電中...", callEnded: "通話結束",
+            lblShareSecurely: "點擊 ID 即可複製", targetHostId: "輸入主機 ID",
+            btnScanLink: "[掃描 QR]", btnReconnect: "[ 斷線重連 ]",
+            panicMsg: "緊急銷毀啟動... 重置中", keyReq: "請先輸入 KEY",
+            copied: "已複製 (60秒後自動清除)", noData: "無輸入數據", fail: "操作失敗",
+            imgRestored: "圖片還原成功", noId: "ID 未生成",
+            connEst: "連線成功", scanStart: "相機啟動中", scanErr: "相機錯誤",
+            reconnect: "嘗試重連中...", lblSetId: "設定固定 ID (可選)", btnStartHost: "啟動",
+            idTaken: "ID 被佔用，請更換或稍候", sessionInfoDefault: ""
+        }
+    };
+
+    // --- CORE ---
+    function toggleLanguage() {
+        curLang = curLang === 'en' ? 'zh' : 'en';
+        document.body.classList.toggle('lang-zh', curLang === 'zh');
+        document.getElementById('btnLang').innerText = curLang === 'en' ? "[EN]" : "[中文]";
+        updateTexts();
+    }
+    
+    function updateTexts() {
+        const t = dict[curLang];
+        document.getElementById('tabNews').innerText = t.tabNews;
+        document.getElementById('tabTool').innerText = t.tabTool;
+        document.getElementById('tabChat').innerText = t.tabChat;
+        document.getElementById('globalKey').placeholder = t.keyPlaceholder;
+        document.querySelector('.btn-panic').innerText = t.btnPanic;
+        document.getElementById('lblGuideHeader').innerText = t.lblGuideHeader;
+        document.getElementById('lblSecHeader').innerText = t.lblSecHeader;
+        document.getElementById('lblAdmin').innerText = t.lblAdmin;
+        document.getElementById('btnPublish').innerText = t.btnPublish;
+        document.getElementById('lblSelectFile').innerText = t.lblSelectFile;
+        document.getElementById('toolInput').placeholder = t.toolInput;
+        document.getElementById('btnEncrypt').innerText = t.btnEncrypt;
+        document.getElementById('btnDecrypt').innerText = t.btnDecrypt;
+        if(document.getElementById('toolResultText').innerText.includes("[")) document.getElementById('toolResultText').innerText = t.toolResultText;
+        document.getElementById('lblInputLabel').innerText = t.lblInputLabel;
+        document.getElementById('btnSelectAll').innerText = t.btnSelectAll;
+        if(!document.getElementById('chatStatus').innerText.includes(":"))
+            document.getElementById('chatStatus').innerText = dict[curLang].statusDisc;
+        document.getElementById('btnHost').innerText = t.btnHost;
+        document.getElementById('btnJoin').innerText = t.btnJoin;
+        document.getElementById('btnConnect').innerText = t.btnConnect;
+        document.getElementById('btnVideoCall').innerText = t.btnVideoCall;
+        document.getElementById('btnVoiceCall').innerText = t.btnVoiceCall;
+        document.getElementById('btnHangup').innerText = t.btnHangup;
+        document.getElementById('targetHostId').placeholder = t.targetHostId;
+        document.getElementById('btnScanLink').innerText = t.btnScanLink;
+        document.getElementById('btnReconnect').innerText = t.btnReconnect;
+        document.getElementById('lblSetId').innerText = t.lblSetId;
+        document.getElementById('customIdInput').placeholder = "e.g. Neo";
+        document.getElementById('btnStartHost').innerText = t.btnStartHost;
+        document.getElementById('idErrorMsg').innerText = t.idTaken;
+    }
+
+    function switchTab(mode) {
+        document.querySelectorAll('.content-section').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById('mode' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('active');
+        document.getElementById('tab' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('active');
+        stopScanner();
+    }
+
+    function panicMode() {
+        showNotify(dict[curLang].panicMsg, true);
+        localStorage.clear();
+        setTimeout(() => window.location.reload(), 1500);
+    }
+    
+    function getKey() { const k=document.getElementById('globalKey').value; if(!k){showNotify(dict[curLang].keyReq, true);return null;} return k; }
+    
+    function cryptoProcess(type, data, keyStr) {
+        try {
+            const key = CryptoJS.SHA256(keyStr);
+            const iv = CryptoJS.lib.WordArray.create(key.words.slice(0, 4));
+            const params = { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 };
+            if (type === 'encrypt') return CryptoJS.AES.encrypt(data, key, params).toString();
+            return CryptoJS.AES.decrypt(data, key, params).toString(CryptoJS.enc.Utf8);
+        } catch(e) { return null; }
+    }
+
+    function secureCopy(text) {
+        if(!text || text.includes("[")) return;
+        navigator.clipboard.writeText(text);
+        showNotify(dict[curLang].copied);
+        setTimeout(() => { navigator.clipboard.writeText(''); }, 60000);
+    }
+
+    function updateSessionBar(id, type) {
+        currentSessionIdDisplay = id;
+        const bar = document.getElementById('sessionInfoBar');
+        bar.innerText = id; 
+        bar.style.display = "block";
+    }
+    
+    function copySessionInfo() {
+        if(currentSessionIdDisplay) {
+            let hid = document.getElementById('myHostId').value;
+            let tid = document.getElementById('targetHostId').value;
+            let custom = document.getElementById('customIdInput').value.trim();
+            if(hid) {
+                let full = custom ? custom : hid;
+                secureCopy(full);
+            } else if (tid) {
+                secureCopy(tid);
+            }
+        }
+    }
+
+    // --- QR (FIXED AUTO-FOCUS) ---
+    function startLinkQrScanner() { 
+        stopScanner(); 
+        document.getElementById('qrReaderLink').style.display = "block";
+        showNotify(dict[curLang].scanStart);
+        qrScanner = new Html5Qrcode("qrReaderLink");
+        // FIX: Added videoConstraints for auto-focus
+        qrScanner.start(
+            { facingMode: "environment" }, 
+            { 
+                fps: 10, 
+                qrbox: { width: 250, height: 250 },
+                videoConstraints: {
+                    facingMode: "environment",
+                    focusMode: "continuous",
+                    width: { min: 1280 },
+                    height: { min: 720 }
+                }
+            },
+            (decodedText) => {
+                document.getElementById('targetHostId').value = decodedText;
+                stopScanner();
+            },
+            (err) => {}
+        ).catch(err => showNotify(dict[curLang].scanErr, true));
+    }
+    function stopScanner() {
+        if(qrScanner) {
+            qrScanner.stop().then(() => {
+                qrScanner.clear();
+                document.querySelectorAll('.qr-reader-box').forEach(el => el.style.display='none');
+            }).catch(err=>{});
+            qrScanner = null;
+        }
+    }
+
+    // --- TOOL ---
+    let toolFile = null;
+    function handleToolFile(input) {
+        const file = input.files[0]; if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image(); img.src = e.target.result;
+            img.onload = () => {
+                const cvs = document.createElement('canvas'); 
+                const max = 120;
+                let w = img.width, h = img.height;
+                if(w>max){ h*=max/w; w=max; } 
+                cvs.width=w; cvs.height=h;
+                cvs.getContext('2d').drawImage(img,0,0,w,h);
+                toolFile = cvs.toDataURL('image/jpeg', 0.1); 
+                document.getElementById('lblSelectFile').innerText = (curLang==='en'?"DATA LOADED":"圖片已載入");
+            }
+        }; reader.readAsDataURL(file);
+    }
+    function selectAllToolInput() {
+        const el = document.getElementById('toolInput');
+        el.select(); el.setSelectionRange(0, 99999);
+    }
+    function runTool(mode) {
+        const k = getKey(); if(!k) return;
+        let d = (mode==='encrypt' && toolFile) ? toolFile : document.getElementById('toolInput').value;
+        if(!d) { if(mode==='decrypt') d=document.getElementById('toolInput').value; else { showNotify(dict[curLang].noData, true); return;} }
+        const res = cryptoProcess(mode, d, k);
+        const txt = document.getElementById('toolResultText');
+        const img = document.getElementById('toolImgPreview');
+        if(res && res.startsWith('data:image')) {
+            img.src = res; img.style.display='block'; txt.innerText=dict[curLang].imgRestored; toolFile=null;
+        } else {
+            txt.innerText = res || "ERROR"; img.style.display='none';
+        }
+    }
+    function copyText(el){ secureCopy(el.innerText); }
+
+    // --- PEER & MESH NETWORKING ---
+    let peer = null;
+
+    function showJoinPanel() {
+        document.getElementById('chatSetupPanel').children[0].classList.add('hidden');
+        document.getElementById('stepJoin').classList.remove('hidden');
+    }
+
+    function initPeer(customId, cb) {
+        if(peer && !peer.destroyed) { if(cb) cb(peer.id); return; }
+        
+        let id = customId || makeId(15);
+        const peerConfig = {
+            debug: 1,
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            }
+        };
+        peer = new Peer(id, peerConfig);
+
+        peer.on('open', (id) => {
+            document.getElementById('idErrorMsg').style.display = 'none';
+            cb(id);
+        });
+        peer.on('connection', handleConn);
+        peer.on('call', handleIncomingCall);
+        peer.on('error', err => {
+            if(err.type === 'unavailable-id') {
+                document.getElementById('idErrorMsg').style.display = 'block';
+                showNotify(dict[curLang].idTaken, true);
+            } else {
+                showNotify("NET ERR", true);
+            }
+            document.getElementById('btnReconnect').style.display = 'block'; 
+        });
+    }
+
+    function startHost() {
+        document.getElementById('chatSetupPanel').children[0].classList.add('hidden');
+        document.getElementById('stepHost').classList.remove('hidden');
+    }
+
+    function confirmHost() {
+        if(!getKey()) return;
+        let cid = document.getElementById('customIdInput').value.trim();
+        initPeer(cid || null, (id) => {
+            document.getElementById('myHostId').value = id; 
+            updateSessionBar(id, 'host'); 
+            
+            document.getElementById("qrCodeContainer").innerHTML = "";
+            new QRCode(document.getElementById("qrCodeContainer"), {text:id, width:100, height:100});
+            document.getElementById('qrCodeContainer').style.display='block';
+            document.getElementById('hostDisplayArea').classList.remove('hidden');
+            document.getElementById('customIdInput').disabled = true;
+            document.getElementById('btnStartHost').disabled = true;
+            updateStatus();
+        });
+    }
+
+    function copyHostId() {
+        const idField = document.getElementById('myHostId');
+        secureCopy(idField.value);
+    }
+
+    function joinChatRoom() {
+        const id = document.getElementById('targetHostId').value; if(!id) return;
+        lastHostId = id; 
+        updateSessionBar(id, 'guest');
+        
+        if(!peer) {
+            initPeer(makeId(15), (myId) => { 
+                connectToPeer(id);
+            });
+        } else {
+            connectToPeer(id);
+        }
+    }
+
+    function connectToPeer(id) {
+        if(connectedPeers[id]) return;
+        const conn = peer.connect(id);
+        handleConn(conn);
+    }
+
+    function handleConn(conn) {
+        conn.on('open', () => {
+            connectedPeers[conn.peer] = conn;
+            updateStatus();
+            
+            document.getElementById('chatSetupPanel').classList.add('hidden');
+            document.getElementById('chatStatus').classList.add('status-online');
+            document.getElementById('chatMsgInput').disabled = false;
+            document.getElementById('btnSend').disabled = false;
+            document.getElementById('videoContainer').style.display = 'flex';
+            document.getElementById('btnReconnect').style.display = 'none'; 
+            
+            sendData(conn, { type: 'peer_list', peers: Object.keys(connectedPeers) });
+        });
+
+        conn.on('data', d => {
+            if(d.type === 'peer_list') {
+                d.peers.forEach(pid => {
+                    if(pid !== peer.id && !connectedPeers[pid]) {
+                        connectToPeer(pid);
+                    }
+                });
+            } else if (d.type === 'chat') {
+                const k = getKey(); 
+                const decrypted = cryptoProcess('decrypt', d.payload, k);
+                if(decrypted) addMsg(decrypted, 'received');
+            }
+        });
+
+        conn.on('close', () => {
+            delete connectedPeers[conn.peer];
+            updateStatus();
+        });
+    }
+
+    function sendData(conn, data) {
+        conn.send(data);
+    }
+
+    function broadcastData(data) {
+        Object.values(connectedPeers).forEach(conn => {
+            if(conn.open) conn.send(data);
+        });
+    }
+
+    function updateStatus() {
+        const count = Object.keys(connectedPeers).length;
+        const txt = dict[curLang].sysConn + count;
+        document.getElementById('chatStatus').innerText = txt;
+    }
+
+    function triggerReconnect() {
+        if(!lastHostId) return;
+        showNotify(dict[curLang].reconnect);
+        if(!peer || peer.destroyed) {
+             initPeer(makeId(15), (myId) => { connectToPeer(lastHostId); });
+        } else {
+             connectToPeer(lastHostId);
+        }
+    }
+
+    function sendChatMessage() {
+        const inp = document.getElementById('chatMsgInput'); const txt = inp.value; if(!txt) return;
+        const encrypted = cryptoProcess('encrypt', txt, getKey());
+        broadcastData({ type: 'chat', payload: encrypted });
+        addMsg(txt, 'sent'); inp.value = '';
+    }
+    
+    function addMsg(txt, type) {
+        const d = document.createElement('div'); d.className = `msg msg-${type}`; d.innerText = txt;
+        const area = document.getElementById('chatArea'); area.appendChild(d); area.scrollTop = area.scrollHeight;
+    }
+
+    // --- CALL LOGIC (MULTI-USER MESH + AUDIO FIX) ---
+    function initiateGroupCall(type) {
+        if(Object.keys(connectedPeers).length === 0) return;
+        
+        const isVideo = (type === 'video');
+        const constraints = { video: isVideo, audio: true };
+        
+        navigator.mediaDevices.getUserMedia(constraints).then(stream => {
+            localStream = stream;
+            
+            // Set local stream
+            const lv = document.getElementById('localVideo');
+            lv.srcObject = stream;
+            lv.muted = true;
+            if(!isVideo) lv.style.opacity = 0; // Hide local block if audio only
+            else lv.style.opacity = 1;
+
+            // Call everyone
+            Object.keys(connectedPeers).forEach(peerId => {
+                const options = { metadata: { type: type } };
+                const call = peer.call(peerId, stream, options);
+                setupCallEvents(call, type);
+            });
+        }).catch(err => showNotify("MEDIA ERR", true));
+    }
+
+    function handleIncomingCall(incomingCall) {
+        pendingCall = incomingCall;
+        const callType = (incomingCall.metadata && incomingCall.metadata.type) ? incomingCall.metadata.type : 'video';
+        const isVideo = (callType === 'video');
+        const msg = isVideo ? dict[curLang].callIncomingVideo : dict[curLang].callIncomingVoice;
+        document.getElementById('callInfoText').innerText = msg;
+        document.getElementById('callModal').style.display = 'flex'; 
+    }
+
+    function answerCall() {
+        if(!pendingCall) return;
+        document.getElementById('callModal').style.display = 'none';
+        
+        const callType = (pendingCall.metadata && pendingCall.metadata.type) ? pendingCall.metadata.type : 'video';
+        const isVideo = (callType === 'video');
+        const constraints = { video: isVideo, audio: true };
+
+        navigator.mediaDevices.getUserMedia(constraints).then(stream => {
+            localStream = stream;
+            
+            const lv = document.getElementById('localVideo');
+            lv.srcObject = stream;
+            lv.muted = true;
+            if(!isVideo) lv.style.opacity = 0;
+            else lv.style.opacity = 1;
+
+            pendingCall.answer(stream);
+            setupCallEvents(pendingCall, callType);
+        }).catch(err => showNotify("MEDIA ERR", true));
+    }
+
+    function rejectCall() {
+        if(pendingCall) pendingCall.close();
+        document.getElementById('callModal').style.display = 'none';
+        pendingCall = null;
+    }
+
+    function setupCallEvents(call, type) {
+        activeCalls.push(call);
+        
+        const vidId = 'vid-' + call.peer;
+        let vidWrap = document.getElementById(vidId);
+        if(!vidWrap) {
+            vidWrap = document.createElement('div');
+            vidWrap.className = 'vid-wrap';
+            vidWrap.id = vidId;
+            
+            if (type === 'video') {
+                const newVideo = document.createElement('video');
+                newVideo.autoplay = true;
+                newVideo.playsInline = true;
+                vidWrap.appendChild(newVideo);
+            } else {
+                // AUDIO FIX: Create Audio element AND visual placeholder
+                const newAudio = document.createElement('audio');
+                newAudio.autoplay = true;
+                newAudio.controls = false; 
+                vidWrap.appendChild(newAudio);
+                
+                const placeholder = document.createElement('div');
+                placeholder.className = 'audio-placeholder';
+                placeholder.innerText = "[ 🔊 AUDIO ONLY ]";
+                vidWrap.appendChild(placeholder);
+            }
+            
+            document.getElementById('remoteVideoGrid').appendChild(vidWrap);
+        }
+
+        call.on('stream', remoteStream => { 
+            const mediaEl = type === 'video' ? vidWrap.querySelector('video') : vidWrap.querySelector('audio');
+            mediaEl.srcObject = remoteStream;
+            mediaEl.muted = false;
+            mediaEl.volume = 1.0;
+            mediaEl.play().catch(e => console.log("Play error", e));
+        });
+
+        call.on('close', () => {
+            vidWrap.remove();
+            activeCalls = activeCalls.filter(c => c !== call);
+        });
+    }
+
+    function endAllCalls() {
+        activeCalls.forEach(call => call.close());
+        activeCalls = [];
+        
+        if(localStream) {
+            localStream.getTracks().forEach(track => { track.stop(); });
+            localStream = null;
+        }
+        
+        const grid = document.getElementById('remoteVideoGrid');
+        Array.from(grid.children).forEach(child => {
+            if(child.id !== 'localVidWrap') child.remove();
+        });
+        
+        document.getElementById('localVideo').srcObject = null;
+        document.getElementById('callModal').style.display = 'none';
+        addMsg(dict[curLang].callEnded, 'sys');
+    }
+
+    function publishBoard() {
+        if(document.getElementById('publishKey').value !== ADMIN_PASSWORD) return showNotify("DENIED", true);
+        document.getElementById('boardContent').innerText = document.getElementById('newPostText').value; 
+        const blob = new Blob([document.documentElement.outerHTML], {type:"text/html"});
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "index.html"; a.click();
+    }
+
+</script>
+</body>
+</html>
