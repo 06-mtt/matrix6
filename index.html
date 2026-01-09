@@ -2,10 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
-<title>Matrix Final 11.1</title>
+<title>Matrix Final 11.2</title>
+
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAMAAAAKE/YAAAAAA1BMVEUEAAArjCdeAAAASElEQVR4nO3BMQEAAADCoPVPbQ0PoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADeBgYAAAGncXwAAAAASUVORK5CYII=">
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAMAAAAKE/YAAAAAA1BMVEUEAAArjCdeAAAASElEQVR4nO3BMQEAAADCoPVPbQ0PoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADeBgYAAAGncXwAAAAASUVORK5CYII=">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
@@ -29,6 +33,8 @@
         background-size: 20px 20px;
         min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; color: #ccaaaa;
         overflow: hidden;
+        /* Prevent elastic scrolling on iOS */
+        overscroll-behavior: none;
     }
     body.lang-zh { font-family: 'Consolas', 'Microsoft JhengHei', monospace; }
 
@@ -38,11 +44,14 @@
         box-shadow: 0 0 30px rgba(255, 0, 0, 0.1);
         width: 100%; max-width: 650px; height: 100vh; 
         display: flex; flex-direction: column; position: relative;
+        /* Safe area handling for iPhone notch */
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
     }
 
     /* --- NOTIFICATION SYSTEM --- */
     #sysNotification {
-        position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+        position: absolute; top: 50px; left: 50%; transform: translateX(-50%);
         background: #220000; border: 1px solid var(--primary-color); color: var(--primary-color);
         padding: 8px 15px; font-size: 11px; z-index: 9999;
         box-shadow: 0 0 15px rgba(255, 50, 50, 0.4);
@@ -118,7 +127,7 @@
     }
     #sessionInfoBar:hover { background: #220000; color: #fff; }
 
-    /* --- DYNAMIC VIDEO GRID --- */
+    /* --- VIDEO/AUDIO UI --- */
     #videoContainer {
         display: none; flex-direction: column; gap: 5px; margin-bottom: 10px;
         background: #000; border: 1px solid var(--dim-color); padding: 5px; flex-shrink: 0; position: relative;
@@ -211,7 +220,7 @@
 
 <div class="card">
     <header>
-        <div class="header-title">MATRIX FINAL 11.1</div>
+        <div class="header-title">MATRIX FINAL 11.2</div>
         <div class="sys-controls">
             <button class="sys-btn" id="btnLang" onclick="toggleLanguage()">[EN]</button>
             <button class="sys-btn btn-panic" onclick="panicMode()">[PANIC]</button>
@@ -548,7 +557,6 @@
         document.getElementById('qrReaderLink').style.display = "block";
         showNotify(dict[curLang].scanStart);
         qrScanner = new Html5Qrcode("qrReaderLink");
-        // FIX: Added videoConstraints for auto-focus
         qrScanner.start(
             { facingMode: "environment" }, 
             { 
@@ -667,7 +675,6 @@
         initPeer(cid || null, (id) => {
             document.getElementById('myHostId').value = id; 
             updateSessionBar(id, 'host'); 
-            
             document.getElementById("qrCodeContainer").innerHTML = "";
             new QRCode(document.getElementById("qrCodeContainer"), {text:id, width:100, height:100});
             document.getElementById('qrCodeContainer').style.display='block';
